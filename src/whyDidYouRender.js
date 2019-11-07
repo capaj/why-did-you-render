@@ -24,7 +24,7 @@ function trackHookChanges(hookName, {path: hookPath}, hookResult, React, options
   const Component = ComponentHookDispatchedFromInstance.type.ComponentForHooksTracking || ComponentHookDispatchedFromInstance.type
   const displayName = getDisplayName(Component)
 
-  const isShouldTrack = shouldTrack(Component, displayName, options)
+  const isShouldTrack = shouldTrack(Component, displayName, options, true)
   if(!isShouldTrack){
     return nextHook
   }
@@ -80,9 +80,7 @@ function getPatchedComponent(componentsMap, Component, displayName, React, optio
 
 export const hooksConfig = {
   useState: {path: '0'},
-  useReducer: {path: '0'},
-  useContext: true,
-  useMemo: true
+  useContext: true
 }
 
 export default function whyDidYouRender(React, userOptions){
@@ -183,6 +181,18 @@ export default function whyDidYouRender(React, userOptions){
         }
       }
     )
+
+    options.trackExtraHooks.forEach(([hookParent, hookName]) => {
+      const originalHook = hookParent[hookName]
+      const newHookName = hookName[0].toUpperCase() + hookName.slice(1)
+      const newHook = function(...args){
+        const hookResult = originalHook.call(this, ...args)
+        trackHookChanges(hookName, {}, hookResult, React, options)
+        return hookResult
+      }
+      Object.defineProperty(newHook, 'name', {value: newHookName, writable: false});
+      hookParent[hookName] = newHook
+    })
   }
 
   React.__REVERT_WHY_DID_YOU_RENDER__ = () => {
